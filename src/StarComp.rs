@@ -1,7 +1,11 @@
 use std::io;
 use std::env;
+
 mod ioreader;
+mod tokens;
+
 use ioreader::*;
+use tokens::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,12 +25,9 @@ fn main() {
     };
 
     let mut line_reader = Line::new(&source[0], true, 0, &source);
-    let contents_temp = line_reader.contents.to_string();
+    let mut block_tree = Block::new(source, None, None); // Primary block never really gets it's contents... read... so?
+    block_tree::search_through();
 
-    println!("{}", contents_temp);
-
-    while (line_reader.next_line(false))
-    {
-        println!("{}", line_reader.contents);
-    }
+    let token_tree = TokenBlock::from_block(&block_tree);
+    
 }
