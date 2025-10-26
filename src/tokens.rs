@@ -34,9 +34,36 @@ pub fn test() -> LuaResult<()> {
     lua.load(&code).exec().expect("Failed to execute Lua file!");
 
     let globals = lua.globals();
-    let debug: LuaFunction = globals.get("debug")?;
+    let comp: LuaFunction = globals.get("comp")?;
 
-    let result: String = debug.call(())?;
+    let tokenValue: LuaValue = comp.call(())?;
+
+    let tokenMap: LuaTable = match tokenValue {
+        LuaValue::Table(t) => t,
+        _ => panic!("Expected a Lua table"),
+    };
+
+    for line_pair in tokenMap.sequence_values::<LuaValue>() {
+        let line_value = line_pair?;
+        let line_table = match line_value {
+            LuaValue::Table(t) => t,
+            _ => continue,
+        };
+
+        for token_pair in line_table.sequence_values::<LuaValue>() {
+            let token_value = token_pair?;
+            let token_table = match token_value {
+                LuaValue::Table(t) => t,
+                _ => continue,
+            };
+
+            let contents: String = token_table.get("Contents")?;
+            let result: Option<f64> = token_table.get("Result")?;
+            let ttype: i64 = token_table.get("Type")?;
+
+            println!("Contents: {}, Result: {:?}, Type: {}", contents, result, ttype);
+        }
+    }
 
     Ok(())
 }
