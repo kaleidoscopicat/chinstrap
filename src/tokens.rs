@@ -5,6 +5,8 @@
  */
 
 use crate::ioreader::*;
+use mlua::prelude::*;
+use std::fs;
 
 pub enum TokenType {
     Keyword,
@@ -17,92 +19,24 @@ pub enum TokenType {
     Unknown,
 }
 
-#[derive(Clone)]
-pub struct Token {
-    pub kind: TokenType,
-    pub contents: String,
-    pub line_number: usize,
-}
+pub fn test() -> LuaResult<()> {
+    let lua = Lua::new();
 
-#[derive(Clone)]
-pub struct TokenLine { // Line @ ioreader.rs
-    pub contents: Vec<Token>,
-    pub source: Vec<Vec<Token>>,
-    pub line_number: usize,
-}
+    let rust_print = lua.create_function(|_, msg: String| {
+        println!("{}", msg);
+        Ok(())
+    })?;
+    lua.globals().set("print", rust_print)?;
 
-#[derive(Clone)]
-pub struct TokenBlock { // Block @ ioreader.rs
-    pub contents: Vec<TokenLine>,
-    pub children: Box<Vec<TokenBlock>>,
-}
+    let code = fs::read_to_string("lua/tokenizer.lua")
+        .expect("Failed to read tokenizer.lua");
 
-impl Token {
-    pub fn from_line(line: &str, line_numer: usize) -> Vec<Token> {
-        let mut tokens: Vec<Token> = Vec::new();
+    lua.load(&code).exec().expect("Failed to execute Lua file!");
 
-        let parts = line.split_whitespace();
+    let globals = lua.globals();
+    let debug: LuaFunction = globals.get("debug")?;
 
-        for part in parts {
-            let kind = if part.starts_with("$$") {
-                TokenType::Comment
-            } else if part.starts_with("\"") && part.ends_with("\"") {
-                TokenType::LiteralString
-            } else if part.chars().all(|c| c.is_numeric()) {
-                TokenType::LiteralNumber
-            } else if ['{', '}', '(', ')', ':', ';', '='].contains(&part) {
-                TokenType::Symbol
-            } else if ["fn", "let", "if", "else", "for", "return", "continue"].contains(&part) {
-                TokenType::Keyword
-            } else if ["+", "-", "*", "/", "->"].contains(&part) {
-                TokenType::Operator
-            } else {
-                TokenType::Identifier
-            };
+    let result: String = debug.call(())?;
 
-            tokens.push(Token {
-                kind,
-                contents: part.to_string(),
-                line_number,
-            })
-        }
-
-        return tokens;
-    }
-}
-
-impl TokenLine {
-    pub fn from_line(line: &Line) -> TokenLine {
-        TokenLine {
-            contents: Token::from_line(&line.contents, line.line_number),
-            source: vec![],
-            line_number: line.line_number,
-        }
-    }
-}
-
-impl TokenBlock {
-    pub fn from_block(block: &Block) -> TokenBlock {
-        let mut token_lines = Vec::new();
-        for (i, line) in block.contents.iter().enumerate() {
-            let line_struct = Line {
-                contents: line.clone(),
-                current_line: false,
-                line_number: i,
-                source: block.contents.clone()
-            };
-
-            token_lines.push(TokenLine::from_line(&line_struct));
-        }
-
-        let mut token_children = Vec::new();
-        for child in block.children.iter() {
-            token_children.push(TokenBlock::from_block(child));
-        }
-
-        return TokenBlock {
-            contents: token_lines,
-            children: Box::new(token_children),
-        };
-    }
+    Ok(())
 }

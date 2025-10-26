@@ -1,0 +1,12 @@
+K:\github\star-shade-compiler\target\debug\deps\which-aa4437569c5d9c44.d: C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\lib.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\checker.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\error.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\finder.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\helper.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\sys.rs
+
+K:\github\star-shade-compiler\target\debug\deps\libwhich-aa4437569c5d9c44.rlib: C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\lib.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\checker.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\error.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\finder.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\helper.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\sys.rs
+
+K:\github\star-shade-compiler\target\debug\deps\libwhich-aa4437569c5d9c44.rmeta: C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\lib.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\checker.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\error.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\finder.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\helper.rs C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\sys.rs
+
+C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\lib.rs:
+C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\checker.rs:
+C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\error.rs:
+C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\finder.rs:
+C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\helper.rs:
+C:\Users\jbart\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\which-8.0.0\src\sys.rs:

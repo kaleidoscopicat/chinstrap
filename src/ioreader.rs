@@ -47,43 +47,6 @@ impl Block {
         clonedBlock.parent_block = Box::new(Some(self.clone()));
         self.children.push(clonedBlock);
     }
-
-    pub fn search_through(&mut self) {
-        let mut current_block_lines: Vec<String> = Vec::new();
-        let mut brace_depth: usize = 0;
-
-        let contents = self.contents.clone();
-        for line in contents {
-            if line.contains('{') {
-                brace_depth += 1;
-                if brace_depth == 1 {
-                    current_block_lines.clear();
-                    continue;
-                }
-            }
-
-            if brace_depth > 0 {
-                current_block_lines.push(line.clone());
-            }
-
-            if line.contains('}') {
-                if brace_depth > 0 {
-                    brace_depth -= 1;
-                }
-
-                if brace_depth == 0 {
-                    current_block_lines.pop();
-
-                    let mut child_block = Block::new(current_block_lines.clone(), Some(self), None);
-                    child_block.search_through();
-
-                    self.add_child(&child_block);
-
-                    current_block_lines.clear();
-                }
-            }
-        }
-    }
 }
 
 impl Line {
