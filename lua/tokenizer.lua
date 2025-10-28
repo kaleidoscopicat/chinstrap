@@ -5,15 +5,33 @@
 ]]--
 
 print("tokenizer.lua -> Loaded!")
+
 local enum_TokenTypes = {
     "Keyword",
     "Identifier",
     "Operator",
     "LiteralString",
     "LiteralNumber",
-    "Symbol",
+    "Seperator",
     "Comment",
+    "Whitespace",
     "Unknown",
+}
+
+local seperators = { ';',
+                     '(',
+                     ')',
+                     '{',
+                     '}',
+                     ',', -- SPECIAL USECASE
+                     '"', -- SPECIAL USECASE
+                     ":", -- SPECIAL USECASE
+                    }
+local operators = {
+    '+', '-', '/', '*', '^', '%', '='
+}
+local keywords = {
+    "if", "while", "return", "continue", "else", "elseif", "fn", "@property", "@uniform"
 }
 
 enum_TokenTypes["Enum"] = function(name)
@@ -28,160 +46,113 @@ enum_TokenTypes["Enum"] = function(name)
     return -1
 end
 
-local operators = { '+', '-', '*', '/', '^', '%', '=', '==', '!=', '<', '>', '<=', '>=' }
-local symbols = { '(', ')', '{', '}', '[', ']', ',', ';' }
-local keywords = { "if", "else", "while", "for", "return", "function", "break", "continue", "true", "false", "null" }
-
-function table_find(tbl, val)
-    for i, v in ipairs(tbl) do
-        if v == val then return i end
-    end
-    return nil
-end
-
-function cleanup(weakTable)
-    local strongTable = {}
-    for _, v in ipairs(weakTable) do
-        if v ~= "" then
-            table.insert(strongTable, v)
+function tableFind(t, v)
+    for _, tV in ipairs(t) do
+        if v == tV then
+            return true
         end
     end
 
-    return strongTable
+    return false
 end
 
-function quickCheckOperative(lineCache)
-    local char = lineCache[1]
-    if char == nil then return true end
-    if #char ~= 1 then return true end
+function RetrieveTokens(lines)
+    local tokenList = {}
 
-    if char == '\\' then
-        return false
-    else
-        return true
+    local function finalizeToken(token)
+        if token.contents ~= "" then
+            -- Match for keywords...
+            if token.type == enum_TokenTypes.Enum("Identifier") and tableFind(keywords, token.contents) then
+                token.type = enum_TokenTypes.Enum("Keyword")
+            end
+            table.insert(tokenList, token)
+        end
     end
-end
 
-function splitTokens(line)
-    local tokens = {}
-    local token = ""
-    local i = 1
-    local insideString = false
+    local function newToken(contents, tokenType)
+        return { contents = contents or "", type = tokenType or enum_TokenTypes.Enum("Unknown") }
+    end
 
-    while i <= #line do
-        local char = line:sub(i,i)
+    for lineNum, line in ipairs(lines) do
+        local currentToken = newToken()
+        for i = 1, #line do
+            local char = line:sub(i, i)
+            local isWhitespace = char:match("%s")
 
-        if char == "\"" then
-            if insideString then
-                token = token .. char
-                table.insert(tokens, token)
-                token = ""
-                insideString = false
+            if isWhitespace then
+                -- It's just whitespace, pop the token currently being written.
+                finalizeToken(currentToken)
+                currentToken = newToken()
             else
-                if token ~= "" then table.insert(tokens, token) end
-                token = char
-                insideString = true
-            end
-        elseif insideString then
-            token = token .. char
-        elseif table_find(operators, char) or table_find(symbols, char) then
-            if token ~= "" then table.insert(tokens, token) end
-            table.insert(tokens, char)
-            token = ""
-        elseif char:match("%s") then
-            if token ~= "" then table.insert(tokens, token) end
-            token = ""
-        else
-            token = token .. char
-        end
-        i = i + 1
-    end
-    if token ~= "" then table.insert(tokens, token) end
-    return tokens
-end
+                -- Check for seperators...
+                if tableFind(seperators, char) then
+                    -- Pop the token currently being written.
+                    
+                    finalizeToken(currentToken)
+                    currentToken = newToken()
 
-function arithmetic(tokens)
-    local numA, numB, currentOp = nil, nil, nil
-    for i, token in ipairs(tokens) do
-        if token.Type == enum_TokenTypes.Enum("LiteralNumber") then
-            if not numA then
-                numA = token.Result
-            elseif currentOp and not numB then
-                numB = token.Result
-                local res = nil
-                if currentOp == "+" then res = numA + numB
-                elseif currentOp == "-" then res = numA - numB
-                elseif currentOp == "*" then res = numA * numB
-                elseif currentOp == "/" then res = numA / numB
-                elseif currentOp == "^" then res = numA ^ numB
-                elseif currentOp == "%" then res = numA % numB
-                end
-                token.Result = res
-                numA, numB, currentOp = res, nil, nil
-            end
-        elseif token.Type == enum_TokenTypes.Enum("Operator") then
-            currentOp = token.Contents
-        end
-    end
-end
+                    -- We've reached a seperator, write this as a new token!
+                    -- Parser should then process all from the previous seperator...
+                    currentToken = {
+                        contents = char,
+                        type = enum_TokenTypes.Enum("Seperator")
+                    }
 
-function comp(lines)
-    local tokenTable = {}
+                    -- Pop the seperator token.
+                    table.insert(tokenList, currentToken)
+                elseif tableFind(operators, char) then
+                    -- Check for operators...
 
-    for _, line in ipairs(lines) do
-        if line:sub(1,2) == "$$" then
-            table.insert(tokenTable, {
-                { Contents = line, Result = nil, Type = enum_TokenTypes.Enum("Comment") }
-            })
-        else
-            local rawTokens = splitTokens(line)
-            rawTokens = cleanup(rawTokens)
-            local lineTokens = {}
+                    finalizeToken(currentToken)
+                    currentToken = newToken()
+                    -- Pop the token currently being written
+                    
+                    currentToken = {
+                        contents = char,
+                        type = enum_TokenTypes.Enum("Operator")
+                    }
 
-            for _, tk in ipairs(rawTokens) do
-                local t = {}
-                -- Numbers
-                local n = tonumber(tk)
-                if n then
-                    t.Contents = tk
-                    t.Result = n
-                    t.Type = enum_TokenTypes.Enum("LiteralNumber")
-                -- Strings
-                elseif tk:sub(1,1) == "\"" and tk:sub(-1,-1) == "\"" then
-                    t.Contents = tk
-                    t.Result = tk:sub(2,-2)
-                    t.Type = enum_TokenTypes.Enum("LiteralString")
-                -- Keywords
-                elseif table_find(keywords, tk) then
-                    t.Contents = tk
-                    t.Result = nil
-                    t.Type = enum_TokenTypes.Enum("Keyword")
-                -- Operators
-                elseif table_find(operators, tk) then
-                    t.Contents = tk
-                    t.Result = nil
-                    t.Type = enum_TokenTypes.Enum("Operator")
-                -- Symbols
-                elseif table_find(symbols, tk) then
-                    t.Contents = tk
-                    t.Result = nil
-                    t.Type = enum_TokenTypes.Enum("Symbol")
+                    -- Pop the operator token.
+                    table.insert(tokenList, currentToken)
+                elseif tonumber(char) ~= nil then 
+                    currentToken.type = enum_TokenTypes.Enum("LiteralNumber")
+                    currentToken.contents = currentToken.contents.. char
                 else
-                    t.Contents = tk
-                    t.Result = nil
-                    t.Type = enum_TokenTypes.Enum("Identifier")
-                end
-                table.insert(lineTokens, t)
-            end
+                    -- Assume it's an identifier.
+                    if currentToken.type ~= enum_TokenTypes.Enum("Identifier") and currentToken.type ~= enum_TokenTypes.Enum("Keyword") then
+                        currentToken.type = enum_TokenTypes.Enum("Identifier")
+                    end
 
-            arithmetic(lineTokens)
-            table.insert(tokenTable, lineTokens)
+                    currentToken.contents = currentToken.contents.. char
+                end
+            end
         end
+
+        finalizeToken(currentToken)
     end
 
-    return tokenTable
+    return tokenList
 end
 
-function hasResult(compTokens)
-    return compTokens["Result"] ~= nil
+function tableToString(tbl, indent)
+    indent = indent or 0
+    local toprint = string.rep(" ", indent) .. "{\n"
+    indent = indent + 2
+    for k, v in pairs(tbl) do
+        toprint = toprint .. string.rep(" ", indent)
+        if type(k) == "number" then
+            toprint = toprint .. "[" .. k .. "] = "
+        elseif type(k) == "string" then
+            toprint = toprint .. k .. " = "
+        end
+        if type(v) == "table" then
+            toprint = toprint .. tableToString(v, indent + 2) .. ",\n"
+        elseif type(v) == "string" then
+            toprint = toprint .. '"' .. v .. '",\n'
+        else
+            toprint = toprint .. tostring(v) .. ",\n"
+        end
+    end
+    toprint = toprint .. string.rep(" ", indent - 2) .. "}"
+    return toprint
 end
