@@ -5,7 +5,7 @@
 Chinstrap is a lightweight, human-readable shader language designed specifically for direct integration with Unity and a C#/Rust-friendly syntax. It is purpose-built for ease of use and maintainability, without the verbosity of traditional HLSL, which it compiles directly into. The compiler for Chinstrap is written in Lua and Rust.
 
 ## Features
-* **Friendly syntax**: Type non-specific function & variable declarations (fn), readable indenting (moving away from HLSL boilerplate), Unity-like types (`Vector2`/`float2`, `Vector3`/`float3`, `Array`/`RWStructuredBuffer<T>`).
+* **Friendly syntax**: Type non-specific function & variable declarations (fn), readable indenting (moving away from HLSL boilerplate), Unity-like types (`Vector3`/`float3`, `Vector4`/`float4`/`Color`, `Array`/`RWStructuredBuffer<T>`).
 * **Logical backwards** compatability with HLSL, whilst having more readable methods alongside it. (e.g. `Vector3` and `float3` both get compiled into a `float3`)
 * **Lightweight compiler**: The compiler is designed to be fast and minimal, parsing .csp files efficiently with a Lua-based parser, making it suitable for iterative development and quick testing.
 * **VSCode support**: A dedicated extension provides syntax highlighting, snippets for syntax (fn, @uniform, @property, tables), and integrated in-editor compilation.
