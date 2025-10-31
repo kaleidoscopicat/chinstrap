@@ -1,0 +1,1 @@
+K:\github\chinstrap\target\debug\chinstrap.exe: K:\github\chinstrap\lua\parser.lua K:\github\chinstrap\lua\tokenizer.lua K:\github\chinstrap\src\ioreader.rs K:\github\chinstrap\src\main.rs K:\github\chinstrap\src\middleman.rs

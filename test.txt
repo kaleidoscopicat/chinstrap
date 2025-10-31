@@ -1,3 +1,2 @@
-line 0
-hello, world!
-test 123!
+message = "Hello, World!";
+age = 3 / 3 * pi;

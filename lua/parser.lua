@@ -63,7 +63,7 @@ local Cursor = {
 				return token.contents == value
 			end,
 
-			expectUntilComma = function(self, value)
+			expectUntilComma = function(self)
 				local tokens = {}
 				local token = self:read()
 
@@ -73,7 +73,19 @@ local Cursor = {
 				end
 
 				return tokens, self.id
-			end
+			end,
+
+			expectUntil = function(self, char)
+				local tokens = {}
+				local token = self:read()
+
+				while token.contents ~= char and token.contents ~= ";" do
+					table.insert(tokens, token)
+					token = self:read()
+				end
+
+				return tokens, self.id
+			end,
 			
 			liquidate = function(self)
 				self.source = nil
@@ -89,6 +101,8 @@ local Cursor = {
 		return newCursor
 	end
 }
+
+local quickMaths = { "sin", "max", "sample", "pi", "cos", "tan", "sinh", "cosh", "tanh", "dot" }
 
 function tableFind(t, v)
 	for _, tV in ipairs(t) do
@@ -123,24 +137,22 @@ function tableToString(tbl, indent)
 	return toprint
 end
 
-function Node(_class, ...)
-	local class = _class or "Root"
-	local args = table.pack(...) or {}
-	
-	local mt = {
-		__tostring = function(v)
-			return tableToString(v)
-		end
-	}
+function Node(class, ...)
 	local node = {
-		class = class,
-		children = args,
-		pop = function(self, child)
+		class = class or "Root",
+		children = { ... },
+
+		push = function(self, child)
 			table.insert(self.children, child)
 		end,
 	}
 	
-	setmetatable(node, mt)
+	setmetatable(node, {
+		__tostring = function(v)
+			return tableToString(v)
+		end
+	})
+
 	return node
 end
 
@@ -162,6 +174,34 @@ function Is(object, value)
 	return object.contents == value
 end
 
+function RPNtoAST(tokens)
+	--print("RPN:", tableToString(tokens))
+	local stack = {}
+
+	for _, token in ipairs(tokens) do
+		local t = token.contents or token
+
+		if tonumber(t) then
+			table.insert(stack, Node("Number", token))
+		elseif t:match("^[%a_]+$") then -- RegEx sucks man
+			table.insert(stack, Node("Variable", token))
+		elseif t == "+" or t == "-" or t == "*" or t == "/" or t == "^" then
+			local right = table.remove(stack)
+			local left = table.remove(stack)
+			table.insert(stack, Node("Operator", token, left, right))
+		else
+			error("Error code 1: Unknown token [" .. tostring(t).. "]")
+		end
+	end
+
+	if #stack ~= 1 then
+		print("BAD RPN:", tableToString(tokens))
+		print("STACK:", tableToString(stack))
+	end
+	assert(#stack == 1, "Error code 2: Malformed RPN Expression")
+	return stack[1]
+end
+
 function ParseLogic(tokens)
 	local outputStack = {}
 	local operatorStack = {}
@@ -181,43 +221,43 @@ function ParseLogic(tokens)
 	for index, token, lookAhead in IReader(tokens) do
 		local contents = token.contents
 		if tonumber(contents) ~= nil then
-			table.insert(outputStack, tonumber(contents))
+			table.insert(outputStack, token)
 		elseif lookAhead(1) and lookAhead(1).contents == "(" then
-			table.insert(operatorStack, contents)
+			table.insert(operatorStack, token)
 		elseif token.type == 2 then
 			local o2 = operatorStack[#operatorStack]
-			while o2 and o2 ~= "(" and (precedence[o2] > precedence[contents] or (precedence[o2] == precedence[contents] and not rightHanded[contents])) do
+			while o2 and o2.contents ~= "(" and (precedence[o2.contents] > precedence[contents] or (precedence[o2.contents] == precedence[contents] and not rightHanded[contents])) do
 				table.remove(operatorStack, #operatorStack)
 				table.insert(outputStack, o2)
 				o2 = operatorStack[#operatorStack]
 			end
-			table.insert(operatorStack, contents)
+			table.insert(operatorStack, token)
 		elseif contents == ',' then
 			local o2 = operatorStack[#operatorStack]
-			while (o2 ~= "(") do
+			while (o2 and o2.contents ~= "(") do
 				table.remove(operatorStack, #operatorStack)
 				table.insert(outputStack, o2)
 				o2 = operatorStack[#operatorStack]
 			end
 		elseif contents == '(' then
-			table.insert(operatorStack, contents)
+			table.insert(operatorStack, token)
 		elseif contents == ')' then
 			local o2 = operatorStack[#operatorStack]
-			while (o2 ~= "(") do
+			while (o2 and o2.contents ~= "(") do
 				assert(#operatorStack ~= 0)
 				table.remove(operatorStack, #operatorStack)
 				table.insert(outputStack, o2)
 				o2 = operatorStack[#operatorStack]
 			end
-			assert(o2 == '(')
+			assert(o2.contents == '(')
 			table.remove(operatorStack, #operatorStack)
 			o2 = operatorStack[#operatorStack]
-			if (o2 ~= '(' and o2 ~= ')' and precedence[o2] == nil) then
+			if (o2.contents ~= '(' and o2.contents ~= ')' and precedence[o2.contents] == nil) then
 				table.remove(operatorStack, #operatorStack)
 				table.insert(outputStack, o2)
 			end
 		elseif token.type == 1 then
-			table.insert(outputStack, contents)
+			table.insert(outputStack, token)
 		end 
 		::continue::
 	end
@@ -233,22 +273,52 @@ function ParseLogic(tokens)
 end
 
 function ParseNumber(cursor)
+	cursor:regressCursor()
 
+	local startingId = cursor.id
+	local tokens, id = cursor:expectUntilComma()
+
+	local rpnStack = ParseLogic(tokens)
+	local ASTNode = RPNtoAST(rpnStack)
+
+	return ASTNode
 end
 
-function ParseAssignmentRHS(cursor)
+function ParseIdentifier(cursor)
+	cursor:regressCursor()
+	local token = cursor:read()
+
+	if tableFind(quickMaths, token.contents) then
+		return ParseNumber(cursor)
+	elseif cursor:read() == "(" then
+		-- It's a function!
+		return Node("FunctionCall", token, table.unpack(cursor:expectUntil(')')))
+	else
+		cursor:regressCursor()
+		return Node("Identifier", token)
+	end
+
+	return false
+end
+
+function ParseVariableType(cursor)
 	local token = cursor:read()
 	if token.type == 1 then -- Identifier
-		return Node("Identifier", token)
+		local parsed = ParseIdentifier(cursor)
+		if not parsed then
+			error("Error code 3: Identifier cannot be parsed!")
+		end
+
+		return parsed
 	end
 	if token.type == 3 then -- String
 		return Node("String", token)
 	end
 	if token.type == 4 then -- Number/Logic
-		return Node("Number", token)
+		return ParseNumber(cursor)
 	end
 	if token.type == 5 then -- Not all seperators are good!
-		if token.contents == '(' then -- Logic
+		if token.contents == '(' then -- Number/Logic
 			return ParseNumber(cursor)
 		end
 		if token.contents == '{' then -- Table
@@ -267,7 +337,7 @@ function ParseAssignment(tokenList)
 	if not cursor:testToken("=") then
 		return false
 	end
-	local rhs_node = ParseAssignmentRHS(cursor)
+	local rhs_node = ParseVariableType(cursor)
 	if not rhs_node then
 		return false
 	end
@@ -298,66 +368,8 @@ function ParseTokens(tokenList)
 			motherStack[i] = assignmentNode
 		end
 	end
+
+	return motherStack
 	
-	print(tableToString(motherStack))
+	--print(tableToString(motherStack))
 end
-
-
-ParseTokens({
-  [1] =     {
-      contents = "myVariable",
-      type = 1,
-    },
-  [2] =     {
-      contents = "=",
-      type = 2,
-    },
-  [3] =     {
-      contents = "\"Hello, World!\"",
-      type = 3,
-    },
-  [4] =     {
-      contents = ";",
-      type = 5,
-    },
-  [5] =     {
-      contents = "$ Hello, this is a comment!",
-      type = 6,
-    },
-  [6] =     {
-      contents = "",
-      type = 7,
-    },
-  [7] =     {
-      contents = "$ this is a line comment",
-      type = 6,
-    },
-  [8] =     {
-      contents = "",
-      type = 7,
-    },
-  [9] =     {
-      contents = "a",
-      type = 1,
-    },
-  [10] =     {
-      contents = "=",
-      type = 2,
-    },
-  [11] =     {
-      contents = "10",
-      type = 4,
-    },
-  [12] =     {
-      contents = ";",
-      type = 5,
-    },
-  [13] =     {
-      contents = "$ still a comment!!",
-      type = 6,
-    },
-  [14] =     {
-      contents = "",
-      type = 7,
-    },
-})

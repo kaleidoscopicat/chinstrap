@@ -4,8 +4,6 @@
        compiler.
 ]]--
 
-print("tokenizer.lua -> Loaded!")
-
 local enum_TokenTypes = {
     "Keyword",
     "Identifier",
@@ -234,10 +232,3 @@ function tableToString(tbl, indent)
     toprint = toprint .. string.rep(" ", indent - 2) .. "}"
     return toprint
 end
-
---> The 'debug' callout
-print(tableToString(RetrieveTokens({
-    'myVariable = "Hello, World!"; $ Hello, this is a comment!',
-    '$ this is a line comment',
-    'a = 10; $ still a comment!!'
-})))

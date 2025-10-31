@@ -1,11 +1,18 @@
+/*
+ * @name: main.rs
+ * @author: kaleidoscopicat
+ * @desc: Main file for processing Chinstrap code and compiling it. Gets compiled into an
+ *        exe by Cargo.
+ */
+
 use std::io;
 use std::env;
 
 mod ioreader;
-mod tokens;
+mod middleman;
 
 use ioreader::*;
-use tokens::*;
+use middleman::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -24,8 +31,5 @@ fn main() {
         }
     };
 
-    let mut line_reader = Line::new(&source[0], true, 0, &source);
-    let mut block_tree = Block::new(source, None, None); // Primary block never really gets it's contents... read... so?
-
-    tokens::test();
+    middleman::passthru(source);
 }
