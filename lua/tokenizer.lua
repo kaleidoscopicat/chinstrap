@@ -28,7 +28,7 @@ local seperators = { ';',
                      ":", -- SPECIAL USECASE
                     }
 local operators = {
-    '+', '-', '/', '*', '^', '%', '='
+    '+', '-', '/', '*', '^', '%', '=', '!', '>', '<'
 }
 local keywords = {
     "if", "while", "return", "continue", "else", "elseif", "fn", "@property", "@uniform"
@@ -73,62 +73,140 @@ function RetrieveTokens(lines)
         return { contents = contents or "", type = tokenType or enum_TokenTypes.Enum("Unknown") }
     end
 
+    local inString = false
+    local currentQuote = nil
+
     for lineNum, line in ipairs(lines) do
         local currentToken = newToken()
+
         for i = 1, #line do
             local char = line:sub(i, i)
             local isWhitespace = char:match("%s")
 
-            if isWhitespace then
-                -- It's just whitespace, pop the token currently being written.
-                finalizeToken(currentToken)
-                currentToken = newToken()
+            if inString then
+                -- We're inside a string literal, so include all characters (including spaces)
+                currentToken.contents = currentToken.contents .. char
+                if char == currentQuote then
+                    -- End of string literal, finalize it
+                    finalizeToken(currentToken)
+                    currentToken = newToken()
+                    inString = false
+                    currentQuote = nil
+                end
+
             else
-                -- Check for seperators...
-                if tableFind(seperators, char) then
-                    -- Pop the token currently being written.
-                    
+                -- Not inside a string
+                if char == '"' or char == "'" then
+                    -- Beginning of a string literal
+                    finalizeToken(currentToken)
+                    currentToken = newToken(char, enum_TokenTypes.Enum("LiteralString"))
+                    inString = true
+                    currentQuote = char
+                elseif isWhitespace then
+                    -- It's just whitespace, pop the token currently being written.
                     finalizeToken(currentToken)
                     currentToken = newToken()
-
-                    -- We've reached a seperator, write this as a new token!
-                    -- Parser should then process all from the previous seperator...
-                    currentToken = {
-                        contents = char,
-                        type = enum_TokenTypes.Enum("Seperator")
-                    }
-
-                    -- Pop the seperator token.
-                    table.insert(tokenList, currentToken)
-                elseif tableFind(operators, char) then
-                    -- Check for operators...
-
-                    finalizeToken(currentToken)
-                    currentToken = newToken()
-                    -- Pop the token currently being written
-                    
-                    currentToken = {
-                        contents = char,
-                        type = enum_TokenTypes.Enum("Operator")
-                    }
-
-                    -- Pop the operator token.
-                    table.insert(tokenList, currentToken)
-                elseif tonumber(char) ~= nil then 
-                    currentToken.type = enum_TokenTypes.Enum("LiteralNumber")
-                    currentToken.contents = currentToken.contents.. char
                 else
-                    -- Assume it's an identifier.
-                    if currentToken.type ~= enum_TokenTypes.Enum("Identifier") and currentToken.type ~= enum_TokenTypes.Enum("Keyword") then
-                        currentToken.type = enum_TokenTypes.Enum("Identifier")
-                    end
+                    -- Check for seperators...
+                    if tableFind(seperators, char) then
+                        -- Pop the token currently being written.
+                        finalizeToken(currentToken)
+                        currentToken = newToken()
 
-                    currentToken.contents = currentToken.contents.. char
+                        -- We've reached a seperator, write this as a new token!
+                        -- Parser should then process all from the previous seperator...
+                        currentToken = {
+                            contents = char,
+                            type = enum_TokenTypes.Enum("Seperator")
+                        }
+
+                        -- Pop the seperator token.
+                        finalizeToken(currentToken)
+                        currentToken = newToken()
+                    elseif tableFind(operators, char) then
+                        -- Check for operators...
+                        finalizeToken(currentToken)
+                        currentToken = newToken()
+
+                        -- Pop the token currently being written
+                        currentToken = {
+                            contents = char,
+                            type = enum_TokenTypes.Enum("Operator")
+                        }
+
+                        -- Pop the operator token.
+                        finalizeToken(currentToken)
+                        currentToken = newToken()
+                    elseif tonumber(char) ~= nil then 
+                        -- Build a number literal token.
+                        currentToken.type = enum_TokenTypes.Enum("LiteralNumber")
+                        currentToken.contents = currentToken.contents .. char
+                    elseif char == '$' then
+                        -- Start of a comment. Pop current token.
+                        finalizeToken(currentToken)
+
+                        -- Capture everything until end of line as comment contents
+                        local commentText = line:sub(i)
+                        currentToken = newToken(commentText, enum_TokenTypes.Enum("Comment"))
+                        finalizeToken(currentToken)
+
+                        -- Move to end of line
+                        currentToken = newToken()
+                        break
+                    else
+                        -- Assume it's an identifier.
+                        if currentToken.type ~= enum_TokenTypes.Enum("Identifier")
+                            and currentToken.type ~= enum_TokenTypes.Enum("Keyword") then
+                            currentToken.type = enum_TokenTypes.Enum("Identifier")
+                        end
+
+                        currentToken.contents = currentToken.contents .. char
+                    end
                 end
             end
         end
 
         finalizeToken(currentToken)
+        currentToken = newToken("\n", enum_TokenTypes.Enum("Whitespace"))
+        nowInComment = false
+        finalizeToken(currentToken)
+    end
+
+    local shouldBindString = false
+    local currentBind = ""
+    local startIndex = nil
+    local i = 1
+
+    while i <= #tokenList do
+        local token = tokenList[i]
+
+        if token.contents == '"' then
+            shouldBindString = not shouldBindString
+            if shouldBindString then
+                startIndex = i
+                currentBind = '"'
+            else
+                currentBind = currentBind .. '"'
+                tokenList[startIndex] = {
+                    contents = currentBind,
+                    type = enum_TokenTypes.Enum("LiteralString")
+                }
+
+                for j = i, startIndex + 1, -1 do
+                    table.remove(tokenList, j)
+                end
+
+                i = startIndex
+                shouldBindString = false
+                startIndex = nil
+                currentBind = ""
+            end
+
+        elseif shouldBindString then
+            currentBind = currentBind .. token.contents
+        end
+
+        i = i + 1
     end
 
     return tokenList
@@ -156,3 +234,10 @@ function tableToString(tbl, indent)
     toprint = toprint .. string.rep(" ", indent - 2) .. "}"
     return toprint
 end
+
+--> The 'debug' callout
+print(tableToString(RetrieveTokens({
+    'myVariable = "Hello, World!"; $ Hello, this is a comment!',
+    '$ this is a line comment',
+    'a = 10; $ still a comment!!'
+})))
